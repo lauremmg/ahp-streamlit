@@ -198,7 +198,7 @@ if project_id is None:
 # ================== ENCUESTADO =======================
 # =====================================================
 else:
-    st.title("""CONSULTA A EXPERTOS MEDIANTE ENCUESTA CON MÉTODO AHP:<br>
+    st.title("""CONSULTA A EXPERTOS MEDIANTE ENCUESTA CON MÉTODO AHP:
     Identificación de zonas óptimas para el cultivo de café arábigo en la cuenca hidrográfica del río La Paila, 
     mediante la integración de análisis geoespacial y evaluación multicriterio""")
 
@@ -229,11 +229,16 @@ else:
     **2.** Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
     
     **Escala AHP** 
-    · 1 = Igual importancia (el criterio A es igual de importante al criterio B)<br>
-    · 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)<br>
-    · 5 = Fuerte importancia (la experiencia y el juicio favorecen FUERTEMENTE al criterio A sobre el B)<br>
-    · 7 = Muy fuerte importancia (el criterio A es mucho más importante que el B)<br>
-    · 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)<br>
+    · 1 = Igual importancia (el criterio A es igual de importante al criterio B)
+    
+    · 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)
+    
+    · 5 = Fuerte importancia (la experiencia y el juicio favorecen FUERTEMENTE al criterio A sobre el B)
+    
+    · 7 = Muy fuerte importancia (el criterio A es mucho más importante que el B)
+    
+    · 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)
+    
     · Los valores pares (2,4,6,8) representan intensidades intermedias
     """)
 

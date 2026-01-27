@@ -123,7 +123,7 @@ if project_id is None:
 
         st.success("Proyecto creado correctamente")
 
-        APP_URL = "https://TU-APP.streamlit.app"
+        APP_URL = "ahp-app-encuestacafearabigo.streamlit.app"
         st.code(f"{APP_URL}/?project_id={pid}")
 
         st.info("Este enlace es el que debe enviar a los encuestados.")

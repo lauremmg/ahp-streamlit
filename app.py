@@ -5,6 +5,8 @@ import sqlite3
 import itertools
 import uuid
 import os
+import io
+import zipfile
 
 # =====================================================
 # CONFIG
@@ -17,7 +19,6 @@ st.set_page_config(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.path.join(DATA_DIR, "database.db")
-
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # =====================================================
@@ -66,51 +67,45 @@ def init_db():
             id TEXT PRIMARY KEY,
             project_id TEXT,
             user_name TEXT,
-            cr REAL,
-            file_path TEXT
+            cr REAL
         )
         """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS matrices (
-        response_id TEXT,
-        i INTEGER,
-        j INTEGER,
-        value REAL
+            response_id TEXT,
+            i INTEGER,
+            j INTEGER,
+            value REAL
         )
         """)
 
-
         con.commit()
-
 
 init_db()
 
 # =====================================================
-# ROUTING LOGIC
+# ROUTING
 # =====================================================
-project_id = st.query_params.get("project_id", None)
+project_id = st.query_params.get("project_id")
 
 # =====================================================
-# ADMIN – CREATE PROJECT
+# ===================== ADMIN =========================
 # =====================================================
 if project_id is None:
 
-    st.title("Administrador – Crear Encuesta AHP")
+    st.title("Administrador – Encuestas AHP")
+
+    # -------- CREAR PROYECTO --------
+    st.subheader("➕ Crear nueva encuesta")
 
     project_name = st.text_input("Nombre del proyecto")
-    n_criteria = st.number_input(
-        "Número de criterios",
-        min_value=2,
-        max_value=10,
-        step=1
-    )
+    n_criteria = st.number_input("Número de criterios", 2, 10, 2)
 
-    criteria = []
-    for i in range(int(n_criteria)):
-        criteria.append(
-            st.text_input(f"Criterio {i+1}")
-        )
+    criteria = [
+        st.text_input(f"Criterio {i+1}")
+        for i in range(int(n_criteria))
+    ]
 
     if st.button("Crear proyecto"):
         if not project_name or not all(criteria):
@@ -121,39 +116,32 @@ if project_id is None:
 
         with get_db() as con:
             cur = con.cursor()
-            cur.execute(
-                "INSERT INTO projects VALUES (?, ?)",
-                (pid, project_name)
-            )
+            cur.execute("INSERT INTO projects VALUES (?,?)", (pid, project_name))
             for c in criteria:
-                cur.execute(
-                    "INSERT INTO criteria VALUES (?, ?)",
-                    (pid, c)
-                )
+                cur.execute("INSERT INTO criteria VALUES (?,?)", (pid, c))
             con.commit()
 
+        APP_URL = "https://ahp-app-encuestacafearabigo.streamlit.app"
         st.success("Proyecto creado correctamente")
-
-        APP_URL = "ahp-app-encuestacafearabigo.streamlit.app"
         st.code(f"{APP_URL}/?project_id={pid}")
+        st.info("Este enlace es el que debe enviar a los encuestados")
 
-        st.info("Este enlace es el que debe enviar a los encuestados.")
+    st.divider()
 
-st.divider()
-st.subheader("📥 Descargar resultados de encuestas")
+    # -------- DESCARGAR RESULTADOS --------
+    st.subheader("📥 Descargar resultados")
 
-with get_db() as con:
-    cur = con.cursor()
-    cur.execute("SELECT id, name FROM projects")
-    projects = cur.fetchall()
+    with get_db() as con:
+        cur = con.cursor()
+        cur.execute("SELECT id, name FROM projects")
+        projects = cur.fetchall()
 
-if projects:
+    if not projects:
+        st.info("No hay proyectos creados aún")
+        st.stop()
+
     project_map = {name: pid for pid, name in projects}
-    selected_project = st.selectbox(
-        "Seleccione un proyecto",
-        list(project_map.keys())
-    )
-
+    selected_project = st.selectbox("Proyecto", list(project_map.keys()))
     selected_pid = project_map[selected_project]
 
     with get_db() as con:
@@ -165,137 +153,81 @@ if projects:
         """, (selected_pid,))
         responses = cur.fetchall()
 
-    if responses:
-        st.success(f"Se encontraron {len(responses)} respuestas")
+        cur.execute("SELECT name FROM criteria WHERE project_id=?", (selected_pid,))
+        criteria = [c[0] for c in cur.fetchall()]
 
-        # -------- DESCARGA INDIVIDUAL --------
-        response_map = {
-            f"{user} (CR={round(cr,3)})": rid
-            for rid, user, cr in responses
-        }
+    if not responses:
+        st.warning("Este proyecto no tiene respuestas")
+        st.stop()
 
-        selected_response = st.selectbox(
-            "Descargar respuesta individual",
-            list(response_map.keys())
-        )
+    # -------- ZIP CON TODAS --------
+    zip_buffer = io.BytesIO()
 
-        rid = response_map[selected_response]
+    with zipfile.ZipFile(zip_buffer, "w") as zipf:
+        for rid, user, cr in responses:
+            with get_db() as con:
+                cur = con.cursor()
+                cur.execute("""
+                    SELECT i, j, value
+                    FROM matrices
+                    WHERE response_id=?
+                """, (rid,))
+                data = cur.fetchall()
 
-        with get_db() as con:
-            cur = con.cursor()
-            cur.execute("""
-                SELECT name FROM criteria WHERE project_id=?
-            """, (selected_pid,))
-            criteria = [c[0] for c in cur.fetchall()]
+            size = len(criteria)
+            matrix = np.ones((size, size))
+            for i, j, v in data:
+                matrix[i][j] = v
 
-            cur.execute("""
-                SELECT i, j, value
-                FROM matrices
-                WHERE response_id=?
-            """, (rid,))
-            data = cur.fetchall()
+            df_m = pd.DataFrame(matrix, index=criteria, columns=criteria)
+            df_c = pd.DataFrame({"CR": [cr]})
 
-        size = len(criteria)
-        matrix = np.ones((size, size))
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+                df_m.to_excel(writer, sheet_name="Matriz_AHP")
+                df_c.to_excel(writer, sheet_name="Consistencia", index=False)
 
-        for i, j, v in data:
-            matrix[i][j] = v
+            zipf.writestr(f"{user}.xlsx", buf.getvalue())
 
-        df_matrix = pd.DataFrame(matrix, index=criteria, columns=criteria)
+    st.download_button(
+        "⬇️ Descargar TODAS las matrices (ZIP)",
+        data=zip_buffer.getvalue(),
+        file_name=f"Resultados_{selected_project}.zip"
+    )
 
-        cur.execute("SELECT cr FROM responses WHERE id=?", (rid,))
-        cr_value = cur.fetchone()[0]
-
-        df_cr = pd.DataFrame({"CR": [cr_value]})
-
-        import io
-        buffer = io.BytesIO()
-
-        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            df_matrix.to_excel(writer, sheet_name="Matriz_AHP")
-            df_cr.to_excel(writer, sheet_name="Consistencia", index=False)
-
-        st.download_button(
-            "📄 Descargar Excel individual",
-            data=buffer.getvalue(),
-            file_name=f"Respuestas_{selected_response}.xlsx"
-        )
-
-        # -------- ZIP CON TODAS LAS RESPUESTAS --------
-        st.divider()
-        st.subheader("📦 Descargar TODAS las respuestas")
-
-        import zipfile
-        zip_buffer = io.BytesIO()
-
-        with zipfile.ZipFile(zip_buffer, "w") as zipf:
-            for rid, user, cr in responses:
-                with get_db() as con:
-                    cur = con.cursor()
-                    cur.execute("""
-                        SELECT i, j, value
-                        FROM matrices
-                        WHERE response_id=?
-                    """, (rid,))
-                    data = cur.fetchall()
-
-                matrix = np.ones((size, size))
-                for i, j, v in data:
-                    matrix[i][j] = v
-
-                df_m = pd.DataFrame(matrix, index=criteria, columns=criteria)
-                df_c = pd.DataFrame({"CR": [cr]})
-
-                buf = io.BytesIO()
-                with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-                    df_m.to_excel(writer, sheet_name="Matriz_AHP")
-                    df_c.to_excel(writer, sheet_name="Consistencia", index=False)
-
-                zipf.writestr(
-                    f"Respuestas_{user}.xlsx",
-                    buf.getvalue()
-                )
-
-        st.download_button(
-            "⬇️ Descargar ZIP con todas las matrices",
-            data=zip_buffer.getvalue(),
-            file_name=f"Resultados_{selected_project}.zip"
-        )
-
-    else:
-        st.warning("Este proyecto aún no tiene respuestas.")
+# =====================================================
+# ================== ENCUESTADO =======================
+# =====================================================
 else:
-    st.info("No hay proyectos creados todavía.")
 
-
-# =====================================================
-# RESPONDENT – SURVEY
-# =====================================================
     st.title("Encuesta AHP – Café Arábigo")
+
+    with get_db() as con:
+        cur = con.cursor()
+        cur.execute("SELECT name FROM criteria WHERE project_id=?", (project_id,))
+        criteria = [c[0] for c in cur.fetchall()]
 
     st.markdown("""
     El Proceso Analítico Jerárquico (AHP) es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
-    permitiendo comparar variables de forma estructurada y consistente, transformando juicios expertos en resultados cuantitativos confiables.
+    permitiendo comparar variables de forma estructurada y consistente, transformando juicios expertos en resultados cuantitativos confiables. 
     
     El objetivo de esta encuesta es determinar el peso relativo de las variables que influyen en la aptitud del cultivo de café arábigo, 
     considerando factores climatológicos, topográficos, edáficos y socioeconómicos.
-
-    **Instrucciones**
-    La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe:
-    1. Seleccionar cuál criterio es más importante
-    2. Indicar la intensidad de preferencia (escala 1–9 de Saaty)
     
-    **Escala AHP**  
-    1 = Igual · 3 = Moderada · 5 = Fuerte · 7 = Muy fuerte · 9 = Extrema  
+    **Instrucciones** 
+    La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
+    1. Seleccionar cuál criterio es más importante 
+    2. Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
+    
+    **Escala AHP** 
+    1 = Igual · 3 = Moderada · 5 = Fuerte · 7 = Muy fuerte · 9 = Extrema 
     (Los valores pares representan intensidades intermedias)
     """)
 
-    user_name = st.text_input("Ingrese su nombre")
+    user_name = st.text_input("Nombre del encuestado")
 
     pairs = list(itertools.combinations(range(len(criteria)), 2))
     matrix = np.ones((len(criteria), len(criteria)))
-
-    st.subheader("Comparaciones por pares")
 
     for i, j in pairs:
         c1, c2, c3 = st.columns([4, 4, 3])
@@ -323,62 +255,40 @@ else:
                 matrix[i][j] = 1 / value
 
     if st.button("Enviar encuesta"):
-    if not user_name:
-        st.error("Ingrese su nombre")
-        st.stop()
+        if not user_name:
+            st.error("Ingrese su nombre")
+            st.stop()
 
-    # 1️⃣ Calcular CR
-    cr = calculate_cr(matrix)
+        cr = calculate_cr(matrix)
+        response_id = str(uuid.uuid4())
 
-    # 2️⃣ Guardar respuesta y matriz en la BD
-    response_id = str(uuid.uuid4())
+        with get_db() as con:
+            cur = con.cursor()
+            cur.execute("""
+                INSERT INTO responses VALUES (?,?,?,?)
+            """, (response_id, project_id, user_name, cr))
 
-    with get_db() as con:
-        cur = con.cursor()
+            for i in range(len(criteria)):
+                for j in range(len(criteria)):
+                    cur.execute("""
+                        INSERT INTO matrices VALUES (?,?,?,?)
+                    """, (response_id, i, j, float(matrix[i][j])))
 
-        # Guardar respuesta
-        cur.execute("""
-            INSERT INTO responses VALUES (?,?,?,?,?)
-        """, (
-            response_id,
-            project_id,
-            user_name,
-            cr,
-            None
-        ))
+            con.commit()
 
-        # Guardar matriz COMPLETA
-        for i in range(len(criteria)):
-            for j in range(len(criteria)):
-                cur.execute("""
-                    INSERT INTO matrices VALUES (?,?,?,?)
-                """, (
-                    response_id,
-                    i,
-                    j,
-                    float(matrix[i][j])
-                ))
+        st.success("Encuesta enviada correctamente, gracias por su contribución")
+        st.metric("Consistency Ratio (CR)", cr)
 
-        con.commit()
+        df_m = pd.DataFrame(matrix, index=criteria, columns=criteria)
+        df_c = pd.DataFrame({"CR": [cr]})
 
-    # 3️⃣ Mostrar resultado al usuario
-    st.success("Encuesta enviada correctamente. Gracias por su participación.")
-    st.metric("Consistency Ratio (CR)", cr)
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df_m.to_excel(writer, sheet_name="Matriz_AHP")
+            df_c.to_excel(writer, sheet_name="Consistencia", index=False)
 
-    # 4️⃣ Excel SOLO para el usuario (opcional)
-    df_matrix = pd.DataFrame(matrix, index=criteria, columns=criteria)
-    df_cr = pd.DataFrame({"CR": [cr]})
-
-    import io
-    buffer = io.BytesIO()
-
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df_matrix.to_excel(writer, sheet_name="Matriz_AHP")
-        df_cr.to_excel(writer, sheet_name="Consistencia", index=False)
-
-    st.download_button(
-        "Descargar su matriz AHP",
-        data=buffer.getvalue(),
-        file_name=f"Matriz_AHP_{user_name}.xlsx"
-    )
-
+        st.download_button(
+            "Descargar su matriz AHP",
+            data=buffer.getvalue(),
+            file_name=f"Matriz_AHP_{user_name}.xlsx"
+        )

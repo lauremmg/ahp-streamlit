@@ -98,15 +98,15 @@ if project_id is None:
 
     # -------- CREAR PROYECTO --------
 
-    project_name = st.text_input("Nombre del proyecto")
-    n_criteria = st.number_input("Número de criterios", 2, 10, 2)
+    project_name = st.text_input("Nombre del Proyecto")
+    n_criteria = st.number_input("Número de Criterios", 2, 10, 2)
 
     criteria = [
         st.text_input(f"Criterio {i+1}")
         for i in range(int(n_criteria))
     ]
 
-    if st.button("Crear proyecto"):
+    if st.button("Crear Proyecto"):
         if not project_name or not all(criteria):
             st.error("Complete todos los campos")
             st.stop()
@@ -121,14 +121,14 @@ if project_id is None:
             con.commit()
 
         APP_URL = "https://app-encuesta-ahp.streamlit.app"
-        st.success("Proyecto creado correctamente")
+        st.success("PROYECTO CREADO CORRECTAMENTE")
         st.code(f"{APP_URL}/?project_id={pid}")
         st.info("Este enlace es el que debe enviar a los encuestados")
 
     st.divider()
 
     # -------- DESCARGAR RESULTADOS --------
-    st.subheader("📥 Descargar Resultados")
+    st.subheader("📥 DESCARGAR RESULTADOS")
 
     with get_db() as con:
         cur = con.cursor()
@@ -197,7 +197,7 @@ if project_id is None:
 # =====================================================
 # ================== ENCUESTADO =======================
 # =====================================================
-else:
+    else:
 
     st.title("CONSULTA A EXPERTOS MEDIANTE ENCUESTA CON MÉTODO AHP:
     Identificación de zonas óptimas para el cultivo de café arábigo 

@@ -71,7 +71,18 @@ def init_db():
         )
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS matrices (
+        response_id TEXT,
+        i INTEGER,
+        j INTEGER,
+        value REAL
+        )
+        """)
+
+
         con.commit()
+
 
 init_db()
 
@@ -127,6 +138,135 @@ if project_id is None:
         st.code(f"{APP_URL}/?project_id={pid}")
 
         st.info("Este enlace es el que debe enviar a los encuestados.")
+
+st.divider()
+st.subheader("📥 Descargar resultados de encuestas")
+
+with get_db() as con:
+    cur = con.cursor()
+    cur.execute("SELECT id, name FROM projects")
+    projects = cur.fetchall()
+
+if projects:
+    project_map = {name: pid for pid, name in projects}
+    selected_project = st.selectbox(
+        "Seleccione un proyecto",
+        list(project_map.keys())
+    )
+
+    selected_pid = project_map[selected_project]
+
+    with get_db() as con:
+        cur = con.cursor()
+        cur.execute("""
+            SELECT id, user_name, cr
+            FROM responses
+            WHERE project_id=?
+        """, (selected_pid,))
+        responses = cur.fetchall()
+
+    if responses:
+        st.success(f"Se encontraron {len(responses)} respuestas")
+
+        # -------- DESCARGA INDIVIDUAL --------
+        response_map = {
+            f"{user} (CR={round(cr,3)})": rid
+            for rid, user, cr in responses
+        }
+
+        selected_response = st.selectbox(
+            "Descargar respuesta individual",
+            list(response_map.keys())
+        )
+
+        rid = response_map[selected_response]
+
+        with get_db() as con:
+            cur = con.cursor()
+            cur.execute("""
+                SELECT name FROM criteria WHERE project_id=?
+            """, (selected_pid,))
+            criteria = [c[0] for c in cur.fetchall()]
+
+            cur.execute("""
+                SELECT i, j, value
+                FROM matrices
+                WHERE response_id=?
+            """, (rid,))
+            data = cur.fetchall()
+
+        size = len(criteria)
+        matrix = np.ones((size, size))
+
+        for i, j, v in data:
+            matrix[i][j] = v
+
+        df_matrix = pd.DataFrame(matrix, index=criteria, columns=criteria)
+
+        cur.execute("SELECT cr FROM responses WHERE id=?", (rid,))
+        cr_value = cur.fetchone()[0]
+
+        df_cr = pd.DataFrame({"CR": [cr_value]})
+
+        import io
+        buffer = io.BytesIO()
+
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df_matrix.to_excel(writer, sheet_name="Matriz_AHP")
+            df_cr.to_excel(writer, sheet_name="Consistencia", index=False)
+
+        st.download_button(
+            "📄 Descargar Excel individual",
+            data=buffer.getvalue(),
+            file_name=f"Respuestas_{selected_response}.xlsx"
+        )
+
+        # -------- ZIP CON TODAS LAS RESPUESTAS --------
+        st.divider()
+        st.subheader("📦 Descargar TODAS las respuestas")
+
+        import zipfile
+        zip_buffer = io.BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, "w") as zipf:
+            for rid, user, cr in responses:
+                with get_db() as con:
+                    cur = con.cursor()
+                    cur.execute("""
+                        SELECT i, j, value
+                        FROM matrices
+                        WHERE response_id=?
+                    """, (rid,))
+                    data = cur.fetchall()
+
+                matrix = np.ones((size, size))
+                for i, j, v in data:
+                    matrix[i][j] = v
+
+                df_m = pd.DataFrame(matrix, index=criteria, columns=criteria)
+                df_c = pd.DataFrame({"CR": [cr]})
+
+                buf = io.BytesIO()
+                with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+                    df_m.to_excel(writer, sheet_name="Matriz_AHP")
+                    df_c.to_excel(writer, sheet_name="Consistencia", index=False)
+
+                zipf.writestr(
+                    f"Respuestas_{user}.xlsx",
+                    buf.getvalue()
+                )
+
+        st.download_button(
+            "⬇️ Descargar ZIP con todas las matrices",
+            data=zip_buffer.getvalue(),
+            file_name=f"Resultados_{selected_project}.zip"
+        )
+
+    else:
+        st.warning("Este proyecto aún no tiene respuestas.")
+else:
+    st.info("No hay proyectos creados todavía.")
+
 
 # =====================================================
 # RESPONDENT – SURVEY
@@ -197,49 +337,62 @@ else:
                 matrix[i][j] = 1 / value
 
     if st.button("Enviar encuesta"):
-        if not user_name:
-            st.error("Ingrese su nombre")
-            st.stop()
+    if not user_name:
+        st.error("Ingrese su nombre")
+        st.stop()
 
-        cr = calculate_cr(matrix)
+    # 1️⃣ Calcular CR
+    cr = calculate_cr(matrix)
 
-        df_matrix = pd.DataFrame(
-            matrix,
-            index=criteria,
-            columns=criteria
-        )
+    # 2️⃣ Guardar respuesta y matriz en la BD
+    response_id = str(uuid.uuid4())
 
-        df_cr = pd.DataFrame(
-            {"Métrica": ["CR"], "Valor": [cr]}
-        )
+    with get_db() as con:
+        cur = con.cursor()
 
-        file_name = f"{user_name}_{uuid.uuid4().hex[:6]}.xlsx"
-        file_path = os.path.join(DATA_DIR, file_name)
+        # Guardar respuesta
+        cur.execute("""
+            INSERT INTO responses VALUES (?,?,?,?,?)
+        """, (
+            response_id,
+            project_id,
+            user_name,
+            cr,
+            None
+        ))
 
-        with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
-            df_matrix.to_excel(writer, sheet_name="Matriz_AHP")
-            df_cr.to_excel(writer, sheet_name="Consistencia", index=False)
+        # Guardar matriz COMPLETA
+        for i in range(len(criteria)):
+            for j in range(len(criteria)):
+                cur.execute("""
+                    INSERT INTO matrices VALUES (?,?,?,?)
+                """, (
+                    response_id,
+                    i,
+                    j,
+                    float(matrix[i][j])
+                ))
 
-        with get_db() as con:
-            cur = con.cursor()
-            cur.execute(
-                "INSERT INTO responses VALUES (?,?,?,?,?)",
-                (
-                    str(uuid.uuid4()),
-                    project_id,
-                    user_name,
-                    cr,
-                    file_path
-                )
-            )
-            con.commit()
+        con.commit()
 
-        st.success("Encuesta enviada correctamente, gracias por su contribución")
-        st.metric("Consistency Ratio (CR)", cr)
+    # 3️⃣ Mostrar resultado al usuario
+    st.success("Encuesta enviada correctamente. Gracias por su participación.")
+    st.metric("Consistency Ratio (CR)", cr)
 
-        with open(file_path, "rb") as f:
-            st.download_button(
-                "Descargar matriz AHP",
-                data=f,
-                file_name=f"Matriz_AHP_{user_name}.xlsx"
-            )
+    # 4️⃣ Excel SOLO para el usuario (opcional)
+    df_matrix = pd.DataFrame(matrix, index=criteria, columns=criteria)
+    df_cr = pd.DataFrame({"CR": [cr]})
+
+    import io
+    buffer = io.BytesIO()
+
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df_matrix.to_excel(writer, sheet_name="Matriz_AHP")
+        df_cr.to_excel(writer, sheet_name="Consistencia", index=False)
+
+    st.download_button(
+        "Descargar su matriz AHP",
+        data=buffer.getvalue(),
+        file_name=f"Matriz_AHP_{user_name}.xlsx"
+    )
+

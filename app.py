@@ -221,7 +221,6 @@ else:
     comercial distinto al ámbito investigativo.
     
     **Instrucciones:** 
-    
     La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
     
     **1.** Seleccionar cuál criterio es más importante 
@@ -229,6 +228,7 @@ else:
     **2.** Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
     
     **Escala AHP** 
+    
     · 1 = Igual importancia (el criterio A es igual de importante al criterio B)
     
     · 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)

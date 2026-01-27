@@ -220,7 +220,7 @@ else:
     La información recolectada será utilizada exclusivamente con fines académicos, sin ningún uso 
     comercial distinto al ámbito investigativo.
     
-    **Instrucciones:** <br>
+    **Instrucciones ➜**
     La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
     
     **1.** Seleccionar cuál criterio es más importante 
@@ -229,17 +229,17 @@ else:
     
     **Escala AHP** 
     
-    · 1 = Igual importancia (el criterio A es igual de importante al criterio B)
+    ● 1 = Igual importancia (el criterio A es igual de importante al criterio B)
     
-    · 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)
+    ● 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)
     
-    · 5 = Fuerte importancia (la experiencia y el juicio favorecen FUERTEMENTE al criterio A sobre el B)
+    ● 5 = Fuerte importancia (la experiencia y el juicio favorecen FUERTEMENTE al criterio A sobre el B)
     
-    · 7 = Muy fuerte importancia (el criterio A es mucho más importante que el B)
+    ● 7 = Muy fuerte importancia (el criterio A es mucho más importante que el B)
     
-    · 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)
+    ● 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)
     
-    · Los valores pares (2,4,6,8) representan intensidades intermedias
+    ● Los valores pares (2,4,6,8) representan intensidades intermedias
     """)
 
     user_name = st.text_input("Ingrese su nombre")

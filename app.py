@@ -97,7 +97,6 @@ if project_id is None:
     st.title("Administrador – Encuestas AHP")
 
     # -------- CREAR PROYECTO --------
-    st.subheader("➕ Crear nueva encuesta")
 
     project_name = st.text_input("Nombre del proyecto")
     n_criteria = st.number_input("Número de criterios", 2, 10, 2)
@@ -129,7 +128,7 @@ if project_id is None:
     st.divider()
 
     # -------- DESCARGAR RESULTADOS --------
-    st.subheader("📥 Descargar resultados")
+    st.subheader("📥 Descargar Resultados")
 
     with get_db() as con:
         cur = con.cursor()
@@ -224,10 +223,12 @@ else:
     (Los valores pares representan intensidades intermedias)
     """)
 
-    user_name = st.text_input("Nombre del encuestado")
+    user_name = st.text_input("Ingrese su nombre")
 
     pairs = list(itertools.combinations(range(len(criteria)), 2))
     matrix = np.ones((len(criteria), len(criteria)))
+
+    st.subheader("Comparaciones por pares")
 
     for i, j in pairs:
         c1, c2, c3 = st.columns([4, 4, 3])

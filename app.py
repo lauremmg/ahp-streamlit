@@ -99,7 +99,7 @@ if project_id is None:
     # -------- CREAR PROYECTO --------
 
     project_name = st.text_input("Nombre del Proyecto")
-    n_criteria = st.number_input("Número de Criterios", 2, 10, 2)
+    n_criteria = st.number_input("Número de Criterios", 2, 20, 2)
 
     criteria = [
         st.text_input(f"Criterio {i+1}")

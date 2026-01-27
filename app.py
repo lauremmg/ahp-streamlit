@@ -214,6 +214,7 @@ else:
     considerando factores climatológicos, topográficos, edáficos y socioeconómicos.
     
     **Instrucciones** 
+    
     La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
     1. Seleccionar cuál criterio es más importante 
     2. Indicar la intensidad de preferencia (escala 1–9 de Saaty) 

@@ -6,9 +6,23 @@ import itertools
 import uuid
 import os
 
-# ===============================
-# AHP – Consistency Ratio
-# ===============================
+# =====================================================
+# CONFIG
+# =====================================================
+st.set_page_config(
+    page_title="Encuesta AHP – Café Arábigo",
+    layout="wide"
+)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+DB_PATH = os.path.join(DATA_DIR, "database.db")
+
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# =====================================================
+# AHP – CONSISTENCY RATIO
+# =====================================================
 RI = {
     1: 0.00, 2: 0.00, 3: 0.58, 4: 0.90, 5: 1.12,
     6: 1.24, 7: 1.32, 8: 1.41, 9: 1.45, 10: 1.49
@@ -23,16 +37,13 @@ def calculate_cr(matrix):
     CR = CI / RI[n] if n in RI else 0
     return round(CR, 4)
 
-# ===============================
+# =====================================================
 # DATABASE
-# ===============================
-DB = "data/database.db"
-
+# =====================================================
 def get_db():
-    return sqlite3.connect(DB)
+    return sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def init_db():
-    os.makedirs("data", exist_ok=True)
     with get_db() as con:
         cur = con.cursor()
 
@@ -64,24 +75,17 @@ def init_db():
 
 init_db()
 
-# ===============================
-# STREAMLIT UI
-# ===============================
-st.set_page_config(page_title="AHP Survey", layout="wide")
-
-st.title("Encuesta AHP – Proceso Analítico Jerárquico")
-
-menu = st.sidebar.radio(
-    "Menú",
-    ["Crear proyecto (Admin)", "Responder encuesta"]
-)
+# =====================================================
+# ROUTING LOGIC
+# =====================================================
+project_id = st.query_params.get("project_id", None)
 
 # =====================================================
 # ADMIN – CREATE PROJECT
 # =====================================================
-if menu == "Crear proyecto (Admin)":
+if project_id is None:
 
-    st.header("Crear nuevo proyecto AHP")
+    st.title("Administrador – Crear Encuesta AHP")
 
     project_name = st.text_input("Nombre del proyecto")
     n_criteria = st.number_input(
@@ -98,38 +102,36 @@ if menu == "Crear proyecto (Admin)":
         )
 
     if st.button("Crear proyecto"):
-        if project_name and all(criteria):
-            project_id = str(uuid.uuid4())
-
-            with get_db() as con:
-                cur = con.cursor()
-                cur.execute(
-                    "INSERT INTO projects VALUES (?,?)",
-                    (project_id, project_name)
-                )
-                for c in criteria:
-                    cur.execute(
-                        "INSERT INTO criteria VALUES (?,?)",
-                        (project_id, c)
-                    )
-                con.commit()
-
-            st.success("Proyecto creado")
-            st.code(f"Link para encuestados:\n\nhttps://TU-APP.streamlit.app/?project_id={project_id}")
-
-        else:
+        if not project_name or not all(criteria):
             st.error("Complete todos los campos")
+            st.stop()
+
+        pid = str(uuid.uuid4())
+
+        with get_db() as con:
+            cur = con.cursor()
+            cur.execute(
+                "INSERT INTO projects VALUES (?, ?)",
+                (pid, project_name)
+            )
+            for c in criteria:
+                cur.execute(
+                    "INSERT INTO criteria VALUES (?, ?)",
+                    (pid, c)
+                )
+            con.commit()
+
+        st.success("Proyecto creado correctamente")
+
+        APP_URL = "https://TU-APP.streamlit.app"
+        st.code(f"{APP_URL}/?project_id={pid}")
+
+        st.info("Este enlace es el que debe enviar a los encuestados.")
 
 # =====================================================
-# SURVEY – RESPONDENT
+# RESPONDENT – SURVEY
 # =====================================================
-if menu == "Responder encuesta":
-
-    project_id = st.query_params.get("project_id", None)
-
-    if not project_id:
-        st.warning("Acceda mediante el enlace del proyecto")
-        st.stop()
+else:
 
     with get_db() as con:
         cur = con.cursor()
@@ -140,24 +142,26 @@ if menu == "Responder encuesta":
         criteria = [c[0] for c in cur.fetchall()]
 
     if not criteria:
-        st.error("Proyecto no encontrado")
+        st.error("Proyecto no encontrado o enlace inválido")
         st.stop()
 
-    st.subheader("Introducción")
-    st.write("""
-    El Proceso Analítico Jerárquico (AHP) es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, permitiendo comparar variables de forma estructurada y consistente, transformando juicios expertos en resultados cuantitativos confiables.
+    st.title("Encuesta AHP – Café Arábigo")
+
+    st.markdown("""
+    **Instrucciones**
+    El Proceso Analítico Jerárquico (AHP) es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
+    permitiendo comparar variables de forma estructurada y consistente, transformando juicios expertos en resultados cuantitativos confiables.
     
-    El objetivo de esta encuesta es determinar el peso relativo de las variables que influyen en la aptitud del cultivo de café arábigo, considerando factores climatológicos, topográficos, edáficos y socioeconómicos.
+    El objetivo de esta encuesta es determinar el peso relativo de las variables que influyen en la aptitud del cultivo de café arábigo, 
+    considerando factores climatológicos, topográficos, edáficos y socioeconómicos.
     
-    La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios y el experto debe:
-    Seleccionar cuál criterio es más importante.
-    Asignar una intensidad de preferencia de 1 a 9 según la escala de Saaty.
-    En cada fila se presentan dos criterios. Usted debe:
-    • Seleccionar cuál es más importante
-    • Indicar la intensidad de preferencia según la escala AHP (1–9)
+    La evaluación se realiza mediante comparaciones por pares, En cada fila se presentan dos criterios. Usted debe:
+    1. Seleccionar cuál criterio es más importante
+    2. Indicar la intensidad de preferencia (escala 1–9 de Saaty)
     
-    Escala AHP:
-    1 = Igual importancia · 3 = Moderada · 5 = Fuerte · 7 = Muy fuerte · 9 = Extrema (Los valores pares representan intensidades intermedias)
+    **Escala AHP**  
+    1 = Igual · 3 = Moderada · 5 = Fuerte · 7 = Muy fuerte · 9 = Extrema  
+    (Los valores pares representan intensidades intermedias)
     """)
 
     user_name = st.text_input("Ingrese su nombre")
@@ -168,20 +172,20 @@ if menu == "Responder encuesta":
     st.subheader("Comparaciones por pares")
 
     for i, j in pairs:
-        col1, col2, col3 = st.columns([3, 3, 4])
+        c1, c2, c3 = st.columns([4, 4, 3])
 
-        with col1:
+        with c1:
             choice = st.selectbox(
                 f"{criteria[i]} vs {criteria[j]}",
                 ["", criteria[i], criteria[j]],
-                key=f"choice_{i}_{j}"
+                key=f"c_{i}_{j}"
             )
 
-        with col2:
+        with c2:
             value = st.selectbox(
                 "Intensidad",
                 ["", 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                key=f"value_{i}_{j}"
+                key=f"v_{i}_{j}"
             )
 
         if choice and value:
@@ -199,42 +203,43 @@ if menu == "Responder encuesta":
 
         cr = calculate_cr(matrix)
 
-        # ===============================
-        # EXPORT EXCEL (BPMSG STYLE)
-        # ===============================
         df_matrix = pd.DataFrame(
             matrix,
             index=criteria,
             columns=criteria
         )
 
-        df_cr = pd.DataFrame({
-            "Métrica": ["CR"],
-            "Valor": [cr]
-        })
+        df_cr = pd.DataFrame(
+            {"Métrica": ["CR"], "Valor": [cr]}
+        )
 
-        filename = f"data/Respuestas - {user_name}.xlsx"
+        file_name = f"{user_name}_{uuid.uuid4().hex[:6]}.xlsx"
+        file_path = os.path.join(DATA_DIR, file_name)
 
-        with pd.ExcelWriter(filename, engine="openpyxl") as writer:
+        with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
             df_matrix.to_excel(writer, sheet_name="Matriz_AHP")
             df_cr.to_excel(writer, sheet_name="Consistencia", index=False)
-
-        response_id = str(uuid.uuid4())
 
         with get_db() as con:
             cur = con.cursor()
             cur.execute(
                 "INSERT INTO responses VALUES (?,?,?,?,?)",
-                (response_id, project_id, user_name, cr, filename)
+                (
+                    str(uuid.uuid4()),
+                    project_id,
+                    user_name,
+                    cr,
+                    file_path
+                )
             )
             con.commit()
 
         st.success("Encuesta enviada correctamente, gracias por su contribución")
-        st.metric("CR", cr)
+        st.metric("Consistency Ratio (CR)", cr)
 
-        with open(filename, "rb") as f:
+        with open(file_path, "rb") as f:
             st.download_button(
-                "Descargar su matriz AHP",
+                "Descargar matriz AHP",
                 data=f,
-                file_name=f"Respuestas - {user_name}.xlsx"
+                file_name=f"Matriz_AHP_{user_name}.xlsx"
             )

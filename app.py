@@ -120,7 +120,7 @@ if project_id is None:
                 cur.execute("INSERT INTO criteria VALUES (?,?)", (pid, c))
             con.commit()
 
-        APP_URL = "https://ahp-app-encuestacafearabigo.streamlit.app"
+        APP_URL = "https://app-encuesta-ahp.streamlit.app"
         st.success("Proyecto creado correctamente")
         st.code(f"{APP_URL}/?project_id={pid}")
         st.info("Este enlace es el que debe enviar a los encuestados")
@@ -199,7 +199,10 @@ if project_id is None:
 # =====================================================
 else:
 
-    st.title("Encuesta AHP – Café Arábigo")
+    st.title("CONSULTA A EXPERTOS MEDIANTE ENCUESTA CON MÉTODO AHP:
+    Identificación de zonas óptimas para el cultivo de café arábigo 
+    en la cuenca hidrográfica del río La Paila, mediante la integración de 
+    análisis geoespacial y evaluación multicriterio")
 
     with get_db() as con:
         cur = con.cursor()
@@ -207,21 +210,30 @@ else:
         criteria = [c[0] for c in cur.fetchall()]
 
     st.markdown("""
-    El Proceso Analítico Jerárquico (AHP) es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
-    permitiendo comparar variables de forma estructurada y consistente, transformando juicios expertos en resultados cuantitativos confiables. 
+    El **Proceso Analítico Jerárquico (AHP)** es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
+    permitiendo comparar variables de forma estructurada y consistente. El AHP permite asignar pesos relativos a diferentes criterios 
+    a partir del juicio experto, transformando valoraciones cualitativas en resultados cuantitativos confiables. 
     
-    El objetivo de esta encuesta es determinar el peso relativo de las variables que influyen en la aptitud del cultivo de café arábigo, 
-    considerando factores climatológicos, topográficos, edáficos y socioeconómicos.
+    El objetivo de esta encuesta es determinar el grado de influencia relativa de diversos factores climatológicos, topográficos, edáficos y socioeconómicos
+    sobre el desarrollo y la aptitud del café arábigo, con el fin de establecer ponderaciones técnicas que respalden análisis territoriales y evaluaciones de idoneidad.
+
+    Hemos seleccionado su participación como experto en café para que pueda aportar su conocimiento 
+    y experiencia en la valoración de los criterios que influyen en el desarrollo del café arábigo.
+    La información recolectada será utilizada exclusivamente con fines académicos, sin ningún uso 
+    comercial distinto al ámbito investigativo.
     
-    **Instrucciones** 
-    
+    **Instrucciones:** 
     La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
-    1. Seleccionar cuál criterio es más importante 
-    2. Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
+    **1.** Seleccionar cuál criterio es más importante 
+    **2.** Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
     
     **Escala AHP** 
-    1 = Igual · 3 = Moderada · 5 = Fuerte · 7 = Muy fuerte · 9 = Extrema 
-    (Los valores pares representan intensidades intermedias)
+    · 1 = Igual importancia (el criterio A es igual de importante al criterio B)
+    · 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)
+    · 5 = Fuerte importancia (la experiencia y el juicio favorecen FUERTEMENTE al criterio A sobre el B)
+    · 7 = Muy fuerte importancia (el criterio A es mucho más importante que el B)
+    · 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)
+    · Los valores pares (2,4,6,8) representan intensidades intermedias
     """)
 
     user_name = st.text_input("Ingrese su nombre")

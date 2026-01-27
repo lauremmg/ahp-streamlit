@@ -271,20 +271,6 @@ else:
 # =====================================================
 # RESPONDENT – SURVEY
 # =====================================================
-else:
-
-    with get_db() as con:
-        cur = con.cursor()
-        cur.execute(
-            "SELECT name FROM criteria WHERE project_id=?",
-            (project_id,)
-        )
-        criteria = [c[0] for c in cur.fetchall()]
-
-    if not criteria:
-        st.error("Proyecto no encontrado o enlace inválido")
-        st.stop()
-
     st.title("Encuesta AHP – Café Arábigo")
 
     st.markdown("""

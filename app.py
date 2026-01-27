@@ -220,7 +220,7 @@ else:
     La información recolectada será utilizada exclusivamente con fines académicos, sin ningún uso 
     comercial distinto al ámbito investigativo.
     
-    **Instrucciones:** 
+    **Instrucciones:** <br>
     La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
     
     **1.** Seleccionar cuál criterio es más importante 

@@ -227,7 +227,7 @@ else:
     
     **2.** Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
     
-    **Escala AHP** 
+    **ESCALA AHP** 
     
     ● 1 = Igual importancia (el criterio A es igual de importante al criterio B)
     
@@ -242,12 +242,12 @@ else:
     ● Los valores pares (2,4,6,8) representan intensidades intermedias
     """)
 
-    user_name = st.text_input("Ingrese su nombre")
+    user_name = st.text_input("INGRESE SU NOMBRE")
 
     pairs = list(itertools.combinations(range(len(criteria)), 2))
     matrix = np.ones((len(criteria), len(criteria)))
 
-    st.subheader("Comparaciones por pares")
+    st.subheader("COMPARACIONES POR PARES")
 
     for i, j in pairs:
         c1, c2, c3 = st.columns([4, 4, 3])

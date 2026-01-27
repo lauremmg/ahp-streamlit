@@ -148,14 +148,14 @@ else:
     st.title("Encuesta AHP – Café Arábigo")
 
     st.markdown("""
-    **Instrucciones**
     El Proceso Analítico Jerárquico (AHP) es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
     permitiendo comparar variables de forma estructurada y consistente, transformando juicios expertos en resultados cuantitativos confiables.
     
     El objetivo de esta encuesta es determinar el peso relativo de las variables que influyen en la aptitud del cultivo de café arábigo, 
     considerando factores climatológicos, topográficos, edáficos y socioeconómicos.
-    
-    La evaluación se realiza mediante comparaciones por pares, En cada fila se presentan dos criterios. Usted debe:
+
+    **Instrucciones**
+    La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe:
     1. Seleccionar cuál criterio es más importante
     2. Indicar la intensidad de preferencia (escala 1–9 de Saaty)
     

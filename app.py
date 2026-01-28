@@ -247,7 +247,7 @@ else:
     pairs = list(itertools.combinations(range(len(criteria)), 2))
     matrix = np.ones((len(criteria), len(criteria)))
 
-    st.subheader("COMPARACIONES POR PARES")
+    st.subheader("Comparaciones por pares")
 
     for i, j in pairs:
         c1, c2, c3 = st.columns([4, 4, 3])

@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import sqlite3
+import psycopg2
 import itertools
 import uuid
 import os
@@ -15,11 +15,6 @@ st.set_page_config(
     page_title="Encuesta AHP – Café Arábigo",
     layout="wide"
 )
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-DB_PATH = os.path.join(DATA_DIR, "database.db")
-os.makedirs(DATA_DIR, exist_ok=True)
 
 # =====================================================
 # AHP – CONSISTENCY RATIO
@@ -42,7 +37,13 @@ def calculate_cr(matrix):
 # DATABASE
 # =====================================================
 def get_db():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+    return psycopg2.connect(
+        host=st.secrets["database"]["host"],
+        dbname=st.secrets["database"]["name"],
+        user=st.secrets["database"]["user"],
+        password=st.secrets["database"]["password"],
+        port=st.secrets["database"]["port"]
+    )
 
 def init_db():
     with get_db() as con:
@@ -67,7 +68,7 @@ def init_db():
             id TEXT PRIMARY KEY,
             project_id TEXT,
             user_name TEXT,
-            cr REAL
+            cr NUMERIC
         )
         """)
 
@@ -76,7 +77,7 @@ def init_db():
             response_id TEXT,
             i INTEGER,
             j INTEGER,
-            value REAL
+            value NUMERIC
         )
         """)
 

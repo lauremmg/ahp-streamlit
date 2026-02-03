@@ -1,10 +1,9 @@
 import streamlit as st
+import psycopg2
 import numpy as np
 import pandas as pd
-import psycopg2
 import itertools
 import uuid
-import os
 import io
 import zipfile
 
@@ -17,7 +16,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# AHP – CONSISTENCY RATIO
+# AHP – CONSISTENCY RATIO (NO TOCAR)
 # =====================================================
 RI = {
     1: 0.00, 2: 0.00, 3: 0.58, 4: 0.90, 5: 1.12,
@@ -34,15 +33,17 @@ def calculate_cr(matrix):
     return round(CR, 4)
 
 # =====================================================
-# DATABASE
+# DATABASE – SUPABASE / POSTGRESQL
 # =====================================================
+@st.cache_resource
 def get_db():
     return psycopg2.connect(
         host=st.secrets["database"]["host"],
         dbname=st.secrets["database"]["dbname"],
         user=st.secrets["database"]["user"],
         password=st.secrets["database"]["password"],
-        port=st.secrets["database"]["port"]
+        port=st.secrets["database"]["port"],
+        sslmode="require"
     )
 
 def init_db():
@@ -51,22 +52,22 @@ def init_db():
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY,
-            name TEXT
+            id UUID PRIMARY KEY,
+            name TEXT NOT NULL
         )
         """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS criteria (
-            project_id TEXT,
-            name TEXT
+            project_id UUID REFERENCES projects(id),
+            name TEXT NOT NULL
         )
         """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS responses (
-            id TEXT PRIMARY KEY,
-            project_id TEXT,
+            id UUID PRIMARY KEY,
+            project_id UUID REFERENCES projects(id),
             user_name TEXT,
             cr NUMERIC
         )
@@ -74,7 +75,7 @@ def init_db():
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS matrices (
-            response_id TEXT,
+            response_id UUID REFERENCES responses(id),
             i INTEGER,
             j INTEGER,
             value NUMERIC
@@ -83,7 +84,10 @@ def init_db():
 
         con.commit()
 
-init_db()
+#     evitar que se ejecute infinitamente
+if "db_initialized" not in st.session_state:
+    init_db()
+    st.session_state["db_initialized"] = True
 
 # =====================================================
 # ROUTING
@@ -96,8 +100,6 @@ project_id = st.query_params.get("project_id")
 if project_id is None:
 
     st.title("Administrador – Encuestas AHP")
-
-    # -------- CREAR PROYECTO --------
 
     project_name = st.text_input("Nombre del Proyecto")
     n_criteria = st.number_input("Número de Criterios", 2, 20, 2)
@@ -112,13 +114,19 @@ if project_id is None:
             st.error("Complete todos los campos")
             st.stop()
 
-        pid = str(uuid.uuid4())
+        pid = uuid.uuid4()
 
         with get_db() as con:
             cur = con.cursor()
-            cur.execute("INSERT INTO projects VALUES (?,?)", (pid, project_name))
+            cur.execute(
+                "INSERT INTO projects (id, name) VALUES (%s, %s)",
+                (pid, project_name)
+            )
             for c in criteria:
-                cur.execute("INSERT INTO criteria VALUES (?,?)", (pid, c))
+                cur.execute(
+                    "INSERT INTO criteria (project_id, name) VALUES (%s, %s)",
+                    (pid, c)
+                )
             con.commit()
 
         APP_URL = "https://app-encuesta-ahp.streamlit.app"
@@ -127,8 +135,6 @@ if project_id is None:
         st.info("Este enlace es el que debe enviar a los encuestados")
 
     st.divider()
-
-    # -------- DESCARGAR RESULTADOS --------
     st.subheader("📥 DESCARGAR RESULTADOS")
 
     with get_db() as con:
@@ -146,32 +152,32 @@ if project_id is None:
 
     with get_db() as con:
         cur = con.cursor()
-        cur.execute("""
-            SELECT id, user_name, cr
-            FROM responses
-            WHERE project_id=?
-        """, (selected_pid,))
+        cur.execute(
+            "SELECT id, user_name, cr FROM responses WHERE project_id=%s",
+            (selected_pid,)
+        )
         responses = cur.fetchall()
 
-        cur.execute("SELECT name FROM criteria WHERE project_id=?", (selected_pid,))
+        cur.execute(
+            "SELECT name FROM criteria WHERE project_id=%s",
+            (selected_pid,)
+        )
         criteria = [c[0] for c in cur.fetchall()]
 
     if not responses:
         st.warning("Este proyecto no tiene respuestas")
         st.stop()
 
-    # -------- ZIP CON TODAS --------
     zip_buffer = io.BytesIO()
 
     with zipfile.ZipFile(zip_buffer, "w") as zipf:
         for rid, user, cr in responses:
             with get_db() as con:
                 cur = con.cursor()
-                cur.execute("""
-                    SELECT i, j, value
-                    FROM matrices
-                    WHERE response_id=?
-                """, (rid,))
+                cur.execute(
+                    "SELECT i, j, value FROM matrices WHERE response_id=%s",
+                    (rid,)
+                )
                 data = cur.fetchall()
 
             size = len(criteria)
@@ -205,43 +211,49 @@ else:
 
     with get_db() as con:
         cur = con.cursor()
-        cur.execute("SELECT name FROM criteria WHERE project_id=?", (project_id,))
+        cur.execute(
+            "SELECT name FROM criteria WHERE project_id=%s",
+            (project_id,)
+        )
         criteria = [c[0] for c in cur.fetchall()]
 
-    st.markdown("""
-    El **Proceso Analítico Jerárquico (AHP)** es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
-    permitiendo comparar variables de forma estructurada y consistente. El AHP permite asignar pesos relativos a diferentes criterios 
-    a partir del juicio experto, transformando valoraciones cualitativas en resultados cuantitativos confiables. 
-    
-    El objetivo de esta encuesta es determinar el grado de influencia relativa de diversos factores climatológicos, topográficos, edáficos y socioeconómicos
-    sobre el desarrollo y la aptitud del café arábigo, con el fin de establecer ponderaciones técnicas que respalden análisis territoriales y evaluaciones de idoneidad.
+     st.markdown("""El **Proceso Analítico Jerárquico (AHP)** es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
+     permitiendo comparar variables de forma estructurada y consistente. El AHP permite asignar pesos relativos a diferentes criterios 
+     a partir del juicio experto, transformando valoraciones cualitativas en resultados cuantitativos confiables. 
+     
+     El objetivo de esta encuesta es determinar el grado de influencia relativa de diversos factores climatológicos, topográficos, edáficos y socioeconómicos
+     sobre el desarrollo y la aptitud del café arábigo, con el fin de establecer ponderaciones técnicas que respalden análisis territoriales y evaluaciones de idoneidad.
+     
+     Hemos seleccionado su participación como experto en café para que pueda aportar su conocimiento 
+     y experiencia en la valoración de los criterios que influyen en el desarrollo del café arábigo.
+     La información recolectada será utilizada exclusivamente con fines académicos, sin ningún uso 
+     comercial distinto al ámbito investigativo.
+     
+     **Instrucciones ➜**
+     La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
+     
+     **1.** Seleccionar cuál criterio es más importante 
+     
+     **2.** Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
+     
+     **ESCALA AHP** 
+     
+     ● 1 = Igual importancia (el criterio A es igual de importante al criterio B)
+     
+     ● 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)
+     
+     ● 5 = Fuerte importancia (la experiencia y el juicio favorecen FUERTEMENTE al criterio A sobre el B)
+     
+     ● 7 = Muy fuerte importancia (el criterio A es mucho más importante que el B)
+     
+     ● 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)
+     
+     ● Los valores pares (2,4,6,8) representan intensidades intermedias
+     """)
 
-    Hemos seleccionado su participación como experto en café para que pueda aportar su conocimiento 
-    y experiencia en la valoración de los criterios que influyen en el desarrollo del café arábigo.
-    La información recolectada será utilizada exclusivamente con fines académicos, sin ningún uso 
-    comercial distinto al ámbito investigativo.
-    
-    **Instrucciones ➜**
-    La evaluación se realiza mediante comparaciones por pares. En cada fila se presentan dos criterios, usted debe: 
-    
-    **1.** Seleccionar cuál criterio es más importante 
-    
-    **2.** Indicar la intensidad de preferencia (escala 1–9 de Saaty) 
-    
-    **ESCALA AHP** 
-    
-    ● 1 = Igual importancia (el criterio A es igual de importante al criterio B)
-    
-    ● 3 = Moderada importancia (la experiencia y el juicio favorecen LIGERAMENTE al criterio A sobre el B)
-    
-    ● 5 = Fuerte importancia (la experiencia y el juicio favorecen FUERTEMENTE al criterio A sobre el B)
-    
-    ● 7 = Muy fuerte importancia (el criterio A es mucho más importante que el B)
-    
-    ● 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)
-    
-    ● Los valores pares (2,4,6,8) representan intensidades intermedias
-    """)
+    if not criteria:
+        st.error("Este proyecto no existe o fue eliminado")
+        st.stop()
 
     user_name = st.text_input("INGRESE SU NOMBRE")
 
@@ -251,7 +263,7 @@ else:
     st.subheader("Comparaciones por pares")
 
     for i, j in pairs:
-        c1, c2, c3 = st.columns([4, 4, 3])
+        c1, c2, _ = st.columns([4, 4, 3])
 
         with c1:
             choice = st.selectbox(
@@ -281,19 +293,21 @@ else:
             st.stop()
 
         cr = calculate_cr(matrix)
-        response_id = str(uuid.uuid4())
+        response_id = uuid.uuid4()
 
         with get_db() as con:
             cur = con.cursor()
-            cur.execute("""
-                INSERT INTO responses VALUES (?,?,?,?)
-            """, (response_id, project_id, user_name, cr))
+            cur.execute(
+                "INSERT INTO responses (id, project_id, user_name, cr) VALUES (%s,%s,%s,%s)",
+                (response_id, project_id, user_name, cr)
+            )
 
             for i in range(len(criteria)):
                 for j in range(len(criteria)):
-                    cur.execute("""
-                        INSERT INTO matrices VALUES (?,?,?,?)
-                    """, (response_id, i, j, float(matrix[i][j])))
+                    cur.execute(
+                        "INSERT INTO matrices VALUES (%s,%s,%s,%s)",
+                        (response_id, i, j, float(matrix[i][j]))
+                    )
 
             con.commit()
 

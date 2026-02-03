@@ -216,6 +216,10 @@ else:
             (project_id,)
         )
         criteria = [c[0] for c in cur.fetchall()]
+        
+    if not criteria:
+        st.error("Este proyecto no existe o fue eliminado")
+        st.stop()
 
      st.markdown("""El **Proceso Analítico Jerárquico (AHP)** es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
      permitiendo comparar variables de forma estructurada y consistente. El AHP permite asignar pesos relativos a diferentes criterios 
@@ -250,10 +254,6 @@ else:
      
      ● Los valores pares (2,4,6,8) representan intensidades intermedias
      """)
-
-    if not criteria:
-        st.error("Este proyecto no existe o fue eliminado")
-        st.stop()
 
     user_name = st.text_input("INGRESE SU NOMBRE")
 

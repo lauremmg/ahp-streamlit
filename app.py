@@ -39,7 +39,7 @@ def calculate_cr(matrix):
 def get_db():
     return psycopg2.connect(
         host=st.secrets["database"]["host"],
-        dbname=st.secrets["database"]["name"],
+        dbname=st.secrets["database"]["dbname"],
         user=st.secrets["database"]["user"],
         password=st.secrets["database"]["password"],
         port=st.secrets["database"]["port"]

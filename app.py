@@ -200,9 +200,9 @@ if project_id is None:
 # =====================================================
 else:
 
-    st.title("CONSULTA A EXPERTOS MEDIANTE ENCUESTA CON MÉTODO AHP:
+    st.title("""CONSULTA A EXPERTOS MEDIANTE ENCUESTA CON MÉTODO AHP:
     Identificación de zonas óptimas para el cultivo de café arábigo en la cuenca hidrográfica del río La Paila, 
-    mediante la integración de análisis geoespacial y evaluación multicriterio")
+    mediante la integración de análisis geoespacial y evaluación multicriterio""")
 
     with get_db() as con:
         cur = con.cursor()

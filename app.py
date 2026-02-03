@@ -221,7 +221,7 @@ else:
         st.error("Este proyecto no existe o fue eliminado")
         st.stop()
 
-         st.markdown("""
+    st.markdown("""
     El **Proceso Analítico Jerárquico (AHP)** es un método multicriterio ampliamente utilizado para la toma de decisiones complejas, 
     permitiendo comparar variables de forma estructurada y consistente. El AHP permite asignar pesos relativos a diferentes criterios 
     a partir del juicio experto, transformando valoraciones cualitativas en resultados cuantitativos confiables. 
@@ -256,7 +256,6 @@ else:
     
     Tener en cuenta que un CR menor a **0.10** indica consistencia aceptable.
     """)
-
 
     user_name = st.text_input("INGRESE SU NOMBRE")
 

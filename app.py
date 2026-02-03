@@ -242,6 +242,8 @@ else:
     ● 9 = Extrema importancia (la mayor importancia del criterio A sobre el B está fuera de toda duda)
     
     ● Los valores pares (2,4,6,8) representan intensidades intermedias
+
+    **Tenga en cuenta que un CR menor a 0.10 indica consistencia aceptable**
     """)
 
     user_name = st.text_input("INGRESE SU NOMBRE")
